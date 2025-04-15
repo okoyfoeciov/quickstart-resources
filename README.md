@@ -1,5 +1,13 @@
-# Quickstart Resources
+This is a fork to support streamable HTTP transport for `mcp-client-typescript`. Demo purpose only. 
 
-A repository of servers and clients from the following Model Context Protocol tutorials:
-- [Quickstart](https://modelcontextprotocol.io/quickstart) – a simple MCP weather server
-- [Building MCP clients](https://modelcontextprotocol.io/tutorials/building-a-client) – an LLM-powered chatbot MCP client
+## Usage
+
+1. Deploy your MCP server.
+2. Fill your ANTHROPIC_API_KEY in .env file.
+3. Run: 
+```sh
+cd mcp-client-typescript
+npm install
+npm run build
+node build/index.js <your_mcp_server_url>
+```

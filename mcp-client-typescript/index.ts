@@ -5,7 +5,6 @@ import {
 } from "@anthropic-ai/sdk/resources/messages/messages.mjs";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import readline from "readline/promises";
 
 import dotenv from "dotenv";
@@ -17,10 +16,60 @@ if (!ANTHROPIC_API_KEY) {
   throw new Error("ANTHROPIC_API_KEY is not set");
 }
 
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+
+export default class StreamableHTTPTransport implements Transport {
+  private url: string;
+  onmessage?: (message: JSONRPCMessage) => void;
+
+  constructor(url: string) {
+      this.url = url;
+  }
+
+  async start(): Promise<void> {
+      return new Promise((resolve, reject) => {
+          // do nothing
+      });
+  }
+
+  async send(message: JSONRPCMessage): Promise<void> {
+      const options = {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(message),
+      };
+
+      try {
+          const response = await fetch(this.url, options);
+
+          if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
+          }
+
+          const parsedData = await response.json();
+
+          this.onmessage?.(parsedData);
+
+      } catch (error) {
+          console.error('Fetch request failed:', error);
+          throw error;
+      }
+  }
+
+  async close(): Promise<void> {
+      return new Promise((resolve, reject) => {
+          // do nothing
+      });
+  }
+}
+
 class MCPClient {
   private mcp: Client;
   private anthropic: Anthropic;
-  private transport: StdioClientTransport | null = null;
+  private transport: Transport | null = null;
   private tools: Tool[] = [];
 
   constructor() {
@@ -31,30 +80,9 @@ class MCPClient {
     this.mcp = new Client({ name: "mcp-client-cli", version: "1.0.0" });
   }
 
-  async connectToServer(serverScriptPath: string) {
-    /**
-     * Connect to an MCP server
-     *
-     * @param serverScriptPath - Path to the server script (.py or .js)
-     */
+  async connectToServer(url: string) {
     try {
-      // Determine script type and appropriate command
-      const isJs = serverScriptPath.endsWith(".js");
-      const isPy = serverScriptPath.endsWith(".py");
-      if (!isJs && !isPy) {
-        throw new Error("Server script must be a .js or .py file");
-      }
-      const command = isPy
-        ? process.platform === "win32"
-          ? "python"
-          : "python3"
-        : process.execPath;
-
-      // Initialize transport and connect to server
-      this.transport = new StdioClientTransport({
-        command,
-        args: [serverScriptPath],
-      });
+      this.transport = new StreamableHTTPTransport(url);
       this.mcp.connect(this.transport);
 
       // List available tools
@@ -177,7 +205,7 @@ class MCPClient {
 
 async function main() {
   if (process.argv.length < 3) {
-    console.log("Usage: node build/index.js <path_to_server_script>");
+    console.log("Usage: node build/index.js <mcp_server_url>");
     return;
   }
   const mcpClient = new MCPClient();
